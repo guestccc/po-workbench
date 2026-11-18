@@ -5,6 +5,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ShoppingCartOutlined,
+  SettingOutlined,
+  UnorderedListOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Avatar, Breadcrumb, Button, Flex, Layout, Menu, Tag, Typography, theme } from 'antd'
@@ -16,12 +18,16 @@ const { Text } = Typography
 const MENU_ITEMS = [
   { key: '/dashboard', icon: <AppstoreOutlined />, label: '工作台概览' },
   { key: '/collection', icon: <ShoppingCartOutlined />, label: '采购订单采集' },
+  { key: '/orders', icon: <UnorderedListOutlined />, label: '订单库' },
+  { key: '/settings', icon: <SettingOutlined />, label: '数据源设置' },
 ]
 
 /** 路由标题映射，用于顶部面包屑展示 */
 const ROUTE_TITLES: Record<string, string> = {
   '/dashboard': '工作台概览',
   '/collection': '采购订单采集',
+  '/orders': '订单库',
+  '/settings': '数据源设置',
 }
 
 /** 工作台基础布局：左侧菜单 + 顶部信息栏 + 内容区 */
@@ -37,7 +43,9 @@ export default function WorkbenchLayout() {
     return matched ? [matched.key] : ['/dashboard']
   }, [location.pathname])
 
-  const currentTitle = ROUTE_TITLES[location.pathname] ?? '页面'
+  const currentTitle =
+    ROUTE_TITLES[location.pathname] ??
+    (location.pathname.startsWith('/orders/') ? '订单详情' : '页面')
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -126,7 +134,7 @@ export default function WorkbenchLayout() {
             </Flex>
 
             <Flex align="center" gap={12}>
-              <Tag color="blue">演示环境</Tag>
+              <Tag color="blue">本机运行</Tag>
               <Flex align="center" gap={8}>
                 <Avatar
                   size="small"
@@ -147,7 +155,7 @@ export default function WorkbenchLayout() {
         </Content>
 
         <Footer style={{ textAlign: 'center', color: token.colorTextTertiary, background: 'transparent' }}>
-          企业采购订单采集工作台 · 占位版 v0.1.0
+          企业采购订单采集工作台 · 本机版 v0.2.0
         </Footer>
       </Layout>
     </Layout>

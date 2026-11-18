@@ -1,45 +1,127 @@
 # 企业采购订单采集工作台
 
-基于 React + Ant Design 的企业采购订单采集工作台。当前为 v0.1.0 占位版本：工作台框架与采集占位页面已就绪，具体采集方式待后续需求讨论后实现。
+本地运行的邮政内部采购系统订单采集与查询工作台。**只读采集，不修改目标系统任何数据。**
+
+三个采集通道 + 手动增量合并成一份字段最全的订单库：
+
+| 通道 | 作用 | 独有字段 |
+| --- | --- | --- |
+| 列表全量扫描 | 全量主干 | 订单备注、商城价、商品件数、物流/单号、订单级审核状态、内部订单 ID |
+| 详情全量补全 | 补详情字段 | 购货人、付款/审核/送货时间、邮箱/电话/邮编、品牌、审核人链、操作日志 |
+| 打印预览补全 | 补完整联系方式与含税价 | 完整手机号、下单人姓名/联系方式、完整收货地址、商品含税单价/小计 |
+
+增量更新由用户手动触发，默认拉取最近 7 天。
+
+> 官方导出通道因目标系统存在约 50 单/75~80 行的硬截断且静默丢弃，已完全移除。
+> 完整手机号与商品含税价改由打印预览通道采集；税额、对帐/开票/收款、上级单位、EA 串等
+> 仍无法采集，早期历史订单可能保留这些字段。详见 [docs/collection-plan.md](./docs/collection-plan.md)。
 
 ## 技术栈
 
-- React 19 + TypeScript
-- Ant Design 6.7.1
-- React Router 6
-- Vite 6
-- Vitest + Testing Library（单元测试 / 冒烟测试）
+- 前端：React 19 + TypeScript + Ant Design 6.7.1 + React Router 6 + Vite 6
+- 本地服务：Node 22 + Express 4 + tsx
+- 数据库：SQLite + better-sqlite3（WAL，事务 upsert）
+- 目标系统访问：Node 内置 fetch + 自实现 Cookie Jar（支持 Set-Cookie 更新）
+- 解析：cheerio；并发：p-limit
+- 测试：Vitest + Testing Library
 
 ## 快速开始
 
 ```bash
-# 安装依赖
+# 建议 Node 20.19+ / 22.12+；本机 NVM 可用 nvm use 22
 npm install
 
-# 启动开发服务器（默认 http://localhost:5173）
+# 开发模式：同时启动 API（8787）和前端（5173）
 npm run dev
+# 浏览器打开 http://localhost:5173
 
-# 构建生产包
+# 生产模式：构建后由本地服务统一托管
 npm run build
+npm start
+# 浏览器打开 http://127.0.0.1:8787
 
-# 本地预览构建产物
-npm run preview
-
-# 运行测试
+# 测试 / 类型检查
 npm test
+npm run typecheck
 ```
 
-> 环境要求：Node.js 20.19+ 或 22.12+。
-> antd 6 的依赖链路在测试环境需要 Node 支持 `require(ESM)`，Node 18 会在运行测试时报错。
-> 如使用 nvm，可执行 `nvm use 22` 切换版本。
+> 服务只监听 `127.0.0.1`，不要改成 `0.0.0.0`，否则同一局域网的其他设备可以访问本机 Cookie 代理。
 
-## 第一次使用（给同事看这里）
+## 第一次使用
 
-这套仓库带了一个"新手入口"技能：装好之后，新开一个会话跟 AI 打个招呼，它就会给出三个可点击的快捷选项——
+1. 打开「数据源设置」，从浏览器开发者工具复制登录后的完整 Cookie（需包含 `ECSCP_ID`），粘贴并「保存并检测」。
+2. 登录态有效后，到「采购订单采集」：
+   1. **① 列表全量扫描**：约 5 万页，写入订单主信息、商品行和内部订单 ID，可暂停续跑。
+   2. **② 详情全量补全**：约 49.7 万单，需先完成列表扫描；默认 2 并发 / 350ms，可暂停续跑。
+   3. **③ 打印预览补全**：约 5 万单，按 20 单/批补完整手机号、下单人姓名/联系方式、完整收货地址与商品含税价，可暂停续跑。
+   4. **④ 增量更新**：需要时手动点击，默认近 7 天。
+3. 到「订单库」搜索订单，点击订单号查看字段合集、商品明细、审核链与操作日志。
 
-- **启动项目**：帮你跑起本项目，并在浏览器打开 `http://localhost:5173`
-- **项目介绍**：用大白话讲清楚这个项目是做什么的、现在到哪一步
-- **项目开发**：直接说"我要加个功能"或"这里有个 bug"，进入开发对话
+同一时间只允许一个采集任务运行；暂停后可从任务历史里续跑。Cookie 过期时任务会自动暂停并提示。
+
+## 页面
+
+- `/dashboard` 工作台概览：订单总数、今日新增、商品明细、详情补全进度、最近入库订单。
+- `/collection` 采购订单采集：四条采集通道、当前任务进度、任务历史。
+- `/orders` 订单库：服务端分页，支持订单号/收货人/机构/商品名称搜索、状态与日期过滤。
+- `/orders/:key` 订单详情：订单级全字段、商品明细全字段、审核人链、操作日志、附加结构化字段。
+- `/settings` 数据源设置：加密保存 Cookie、检验登录态、查看采集参数。
+
+## 数据与安全
+
+- 数据库：`data/workbench.db`
+- Cookie 加密密钥：`data/.cookie-secret`（权限 0600）
+- Cookie 使用 AES-256-GCM 加密后存入 SQLite；前端不回显已保存的 Cookie，不写日志。
+- 不保存原始 HTML，不使用任何导出文件。
+- 所有调用目标系统的请求均为只读查询，未调用任何订单写接口。
+- 打印预览补全只发送 `printing=打印订单`、`batch=1`、`checkboxes` 与 `order_id` 字段，
+  不发送取消、删除、确认等任何操作按钮；实测打印前后订单详情（含操作日志）SHA-256 完全一致。
+- 前端通过 `/api` 同源访问本机服务，CORS 仅允许 `localhost` / `127.0.0.1`。
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `PO_WORKBENCH_PORT` | `8787` | 本地 API 端口 |
+| `PO_WORKBENCH_HOST` | `127.0.0.1` | 监听地址，不建议修改 |
+| `PO_WORKBENCH_DB` | `data/workbench.db` | SQLite 路径 |
+| `DSPT_BASE_URL` | 目标系统地址 | 一般不需要改 |
+| `DSPT_REQUEST_INTERVAL_MS` | `350` | 列表/详情请求最小间隔 |
+| `DSPT_DETAIL_CONCURRENCY` | `2` | 详情并发（1~4） |
+
+## 目录结构
+
+```
+po-workbench/
+├── server/
+│   ├── index.ts                  # Express API + 生产静态托管
+│   ├── config.ts                 # 端口、数据库、目标系统参数
+│   ├── db.ts                     # SQLite schema、多通道路由合并、查询
+│   ├── cookie-store.ts           # Cookie 加密存储
+│   ├── dspt/
+│   │   ├── client.ts             # Cookie Jar、登录检测、列表/详情/打印预览请求
+│   │   ├── parse.ts              # 列表 / 详情 / 打印预览 HTML 解析
+│   │   └── sync.ts               # 列表扫描、详情补全、打印补全、增量
+│   └── test/                     # 解析器与数据库单测
+├── shared/types.ts               # 前后端共享类型
+├── src/
+│   ├── api/client.ts             # /api 客户端
+│   ├── pages/
+│   │   ├── dashboard/            # 工作台概览
+│   │   ├── collection/           # 采集控制
+│   │   ├── orders/               # 订单库 + 订单详情
+│   │   └── settings/             # 数据源设置
+│   ├── layouts/                  # 侧边栏 + 顶栏
+│   └── test/                     # 页面冒烟测试
+├── docs/collection-plan.md       # 接口探测、字段对比与采集方案
+└── data/                         # 运行时数据库与密钥（已 gitignore）
+```
+
+## 第一次给同事用（新手入口技能）
+
+> 最省事的方式：把项目发给对方，让他在豆包里说一句「读一下项目根目录的配置说明.md，按里面的步骤配好」，AI 会自己完成配置。手动步骤见 [配置说明.md](./配置说明.md)。
+
+这套仓库带了一个"新手入口"技能：装好之后，新开一个会话跟 AI 打个招呼，它就会给出三个可点击的快捷选项——启动项目、项目介绍、项目开发。
 
 安装（每台电脑装一次即可）：
 
@@ -48,72 +130,7 @@ npm install
 npm run skill:install
 ```
 
-装完**重新开一个会话**才生效（技能在会话开始时加载）。如果打招呼后没看到选项，说明本机的技能目录不在 `~/Doubao/skills`，换目录重装：
-
-```bash
-npm run skill:install -- --target "$HOME/.agents/skills" --force
-```
-
-说明：
-- 技能源文件就在 `skills/po-workbench-entry/`，装的是**软链接**，仓库是唯一真源，改完立即生效
-- 不需要了：`npm run skill:uninstall`（只删链接，不动仓库）
-- 想改三个选项的文案或行为，改 `skills/po-workbench-entry/SKILL.md`
-- 想改"项目介绍"的口径，改 `skills/po-workbench-entry/project-intro.md`
-
-## 目录结构
-
-```
-po-workbench/
-├── public/
-│   └── favicon.svg
-├── scripts/
-│   ├── check-node.mjs               # Node 版本校验（测试前执行）
-│   └── install-skill.sh             # 安装新手入口技能（软链接到本机技能目录）
-├── skills/
-│   └── po-workbench-entry/
-│       ├── SKILL.md                 # 新手入口技能：三个快捷选项与执行流程
-│       └── project-intro.md         # 「项目介绍」使用的口径，改动请同步这里
-├── src/
-│   ├── components/
-│   │   └── ErrorBoundary.tsx        # 全局错误边界
-│   ├── layouts/
-│   │   └── WorkbenchLayout.tsx      # 工作台布局（侧边栏 + 顶栏 + 内容区）
-│   ├── pages/
-│   │   ├── dashboard/index.tsx      # 工作台概览
-│   │   ├── collection/index.tsx     # 采购订单采集（占位）
-│   │   └── NotFound.tsx             # 404 页面
-│   ├── styles/global.css            # 全局样式
-│   ├── test/                        # 测试环境配置与用例
-│   ├── App.tsx                      # 路由表
-│   └── main.tsx                     # 应用入口
-├── index.html
-├── vite.config.ts
-└── tsconfig.json
-```
-
-## 页面说明
-
-### 工作台概览 `/dashboard`
-
-- 核心指标卡片：今日采集订单、待审核订单、已入库订单、异常订单（当前为占位数据）
-- 采集任务 / 采集趋势占位面板
-- 最近订单列表占位表格
-
-### 采购订单采集 `/collection`
-
-占位页面，包含：
-
-- 采集功能建设中提示
-- 规划中的采集流程：配置数据源 → 获取订单数据 → 数据校验 → 写入订单库
-- 禁用的采集入口按钮（开始采集 / 导入 Excel / 配置数据源）
-
-## 后续规划（待讨论）
-
-1. 确定采集方式：接口对接、文件导入或页面抓取
-2. 设计订单数据模型与来源企业配置
-3. 接入后端接口，补充完整的异常处理与加载状态
-4. 增加订单审核、异常处理与导出功能
-5. 补充采集流程的单元测试与接口测试
+装完**重新开一个会话**才生效。不需要了执行 `npm run skill:uninstall`。
 
 ## 开发约定
 
@@ -121,3 +138,4 @@ po-workbench/
 - 所有接口调用需包含完整的异常处理
 - 使用 `@/` 别名引用 `src` 下的模块
 - 修改代码后同步更新测试用例
+- 数据库写入使用事务；外部采集失败必须可在任务历史中看到错误

@@ -24,9 +24,6 @@ export const config = {
   requestIntervalMs: Number(process.env.DSPT_REQUEST_INTERVAL_MS || 350),
   /** 详情全量并发数，默认 2；可通过环境变量调整 */
   detailConcurrency: Math.max(1, Math.min(4, Number(process.env.DSPT_DETAIL_CONCURRENCY || 2))),
-  /** 单月导出任务最长等待时间 */
-  exportTimeoutMs: Number(process.env.DSPT_EXPORT_TIMEOUT_MS || 30 * 60 * 1000),
-  exportStartMonth: process.env.DSPT_EXPORT_START_MONTH || '2019-10',
 }
 
 export function ensureDataDir() {

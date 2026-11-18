@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import WorkbenchLayout from './layouts/WorkbenchLayout'
 import DashboardPage from './pages/dashboard'
 import CollectionPage from './pages/collection'
+import OrdersPage from './pages/orders'
+import OrderDetailPage from './pages/orders/detail'
+import SettingsPage from './pages/settings'
 import NotFoundPage from './pages/NotFound'
 
 /**
@@ -16,6 +19,9 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/collection" element={<CollectionPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:key" element={<OrderDetailPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         {/* 兜底路由：未匹配的地址展示 404 页面 */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>

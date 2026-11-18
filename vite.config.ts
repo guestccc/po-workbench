@@ -14,6 +14,13 @@ export default defineConfig({
   server: {
     port: 5173,
     open: false,
+    proxy: {
+      // 本地采集服务只监听 127.0.0.1，前端通过 Vite 代理访问，避免 CORS 和 Cookie 暴露到浏览器
+      '/api': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: false,
+      },
+    },
   },
   test: {
     environment: 'jsdom',

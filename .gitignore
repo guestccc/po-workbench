@@ -16,6 +16,9 @@ coverage
 # 运行时数据（数据库、登录态密钥等，含敏感信息）
 data
 
+# 本地数据库、Cookie 密钥与导出临时文件
+data/
+
 # 日志
 *.log
 npm-debug.log*
